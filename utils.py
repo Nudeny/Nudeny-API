@@ -1,4 +1,7 @@
 from urllib.parse import urlparse
+from io import BytesIO
+import requests
+import base64
 import imghdr
 
 def is_valid_url(url):
@@ -70,3 +73,37 @@ def is_supported_file_type(file):
         return False
     
     return True
+
+
+def download_image_url(url):
+    """
+    Download the image URL.
+
+    Args:
+        url (str): URL to download.
+
+    Returns:
+        BytesIO: BytesIO of the response.content.
+        str: The file type of the URL.
+    """
+    response = requests.get(url)
+    print(response.headers)
+
+    return BytesIO(response.content), response.headers['Content-Type'].split('/')[1]
+
+def decode_data_uri(uri):
+    """
+    Decode data URI.
+
+    Args:
+        uri (str): data URI to decode.
+
+    Returns:
+        BytesIO: BytesIO of the decoded data URI.
+        str: The file type of the data URI.
+    """
+    data = base64.b64decode(uri.split(",")[1])
+    media_type = uri.split(",")[0]
+    type = media_type.split("/")[1].split(";")[0]
+
+    return BytesIO(data), type

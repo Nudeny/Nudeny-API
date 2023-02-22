@@ -11,7 +11,7 @@ classification_model = NudenyClassify()
 app = FastAPI()
 
 class Image(BaseModel):
-    url: str
+    source: str
 
 @app.post("/classify/")
 async def create_upload_files(files: List[UploadFile]):
@@ -25,5 +25,5 @@ async def create_item(images: List[Image]):
     """
     Receive URL JSON request.
     """
-
-    return {"Prediction": images}
+    return {"Prediction": [classification_model.classifyUrl(image.source) for image in images]}
+    #return {"Prediction": images}
