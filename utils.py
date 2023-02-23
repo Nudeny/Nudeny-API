@@ -20,6 +20,26 @@ def is_valid_url(url):
     except ValueError:
         return False
 
+def is_image_url(url):
+    """
+    Checks if URL has a content-type of image.
+
+    Args:
+        urls (str): URL string.
+
+    Returns:
+        boolean: Returns true if URL has a content-type image and
+        if URL content-type is supported image, otherwise false.
+    """
+    response = requests.get(url)
+    content_type = response.headers['content-type']
+    type = content_type.split('/')[1]
+    if content_type.split('/')[0] != 'image':
+        return False
+
+    image_types = ['jpg','jpeg','png','bmp', 'jfif']
+    return any(type == image_type for image_type in image_types)
+
 def is_url_or_data_uri(str):
     """
     Checks if the string is URL, data URI or neither.
@@ -65,7 +85,6 @@ def is_valid_data_uri(data_uri):
         boolean: Returns True if data_uri is valid, otherwise
         False.
     """
-    print("hello")
     try:
         base64.b64decode(data_uri.split(",")[1], validate=True)
     except:
@@ -106,7 +125,6 @@ def download_image_url(url):
         str: The file type of the URL.
     """
     response = requests.get(url)
-    print(response.headers)
 
     return BytesIO(response.content), response.headers['Content-Type'].split('/')[1]
 

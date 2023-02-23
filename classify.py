@@ -7,7 +7,7 @@ from PIL import Image
 from io import BytesIO
 
 from utils import is_supported_file_type, is_url_or_data_uri, is_valid_url, is_valid_data_uri
-from utils import download_image_url, decode_data_uri, is_data_uri_image
+from utils import download_image_url, decode_data_uri, is_data_uri_image, is_image_url
 
 
 MODEL_NAME = "nudeny-classifier.hdf5"
@@ -32,7 +32,10 @@ class NudenyClassify:
             prediction class.
         """
         if not is_supported_file_type(file):
-            return {filename: "invalid-file-type"}
+            return {
+                "filename": filename,
+                "class": "invalid"
+            }
 
         img = Image.open(BytesIO(file))
 
@@ -77,6 +80,11 @@ class NudenyClassify:
                     "source": source,
                     "class": "invalid"
                 }
+            elif not is_image_url(source):
+                return {
+                    "source": source,
+                    "class": "invalid"
+                }
             else:
                 bytes_io, type = download_image_url(source)
                 img = Image.open(bytes_io)
@@ -88,7 +96,7 @@ class NudenyClassify:
                     "class": "invalid"
                 }
             elif not is_valid_data_uri(source):
-                    return {
+                return {
                     "source": source,
                     "class": "invalid"
                 }
