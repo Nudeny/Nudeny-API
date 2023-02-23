@@ -54,6 +54,26 @@ def is_data_uri_image(data_uri):
     else:
         return False
 
+def is_valid_data_uri(data_uri):
+    """
+    Validate if data URI is a valid base64-encoded string.
+
+    Args:
+        uri (str): data URI to decode.
+
+    Returns:
+        boolean: Returns True if data_uri is valid, otherwise
+        False.
+    """
+    print("hello")
+    try:
+        base64.b64decode(data_uri.split(",")[1], validate=True)
+    except:
+        return False
+    
+    return True
+
+
 def is_supported_file_type(file):
     """
     Checks if file is a supported file and is an image.
@@ -73,7 +93,6 @@ def is_supported_file_type(file):
         return False
     
     return True
-
 
 def download_image_url(url):
     """

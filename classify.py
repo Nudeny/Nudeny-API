@@ -6,7 +6,7 @@ import numpy as np
 from PIL import Image
 from io import BytesIO
 
-from utils import is_supported_file_type, is_url_or_data_uri, is_valid_url
+from utils import is_supported_file_type, is_url_or_data_uri, is_valid_url, is_valid_data_uri
 from utils import download_image_url, decode_data_uri, is_data_uri_image
 
 
@@ -28,8 +28,8 @@ class NudenyClassify:
             filename (str): Image filename.
 
         Returns:
-            dict: Returns a dictionary with filename as a key and 
-            prediction class as value.
+            dict: Returns a dictionary with filename and 
+            prediction class.
         """
         if not is_supported_file_type(file):
             return {filename: "invalid-file-type"}
@@ -67,8 +67,8 @@ class NudenyClassify:
             source (str): Image source.
 
         Returns:
-            dict: Returns a dictionary with filename as a key and 
-            prediction class as value.
+            dict: Returns a dictionary with source and 
+            prediction class.
         """
         source_type = is_url_or_data_uri(source)
         if source_type == "url":
@@ -84,6 +84,11 @@ class NudenyClassify:
         elif source_type == "data_uri":
             if not is_data_uri_image(source):
                 return {
+                    "source": source,
+                    "class": "invalid"
+                }
+            elif not is_valid_data_uri(source):
+                    return {
                     "source": source,
                     "class": "invalid"
                 }
