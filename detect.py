@@ -8,7 +8,11 @@ import os
 import time
 import base64
 import requests
-# import uuid
+from dotenv import load_dotenv
+import uuid
+import boto3
+
+import imghdr
 
 from utils import is_supported_file_type, is_url_or_data_uri, is_valid_url, is_valid_data_uri
 from utils import is_data_uri_image, is_image_url
@@ -29,6 +33,14 @@ class NudenyDetect:
         end_time = time.time()
         elapsed_time = end_time - start_time
         print('Done! Took {} seconds'.format(elapsed_time))
+
+        load_dotenv()
+        session = boto3.Session(
+            aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID'),
+            aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY'),
+            region_name=os.environ.get('AWS_DEFAULT_REGION')
+        )
+        self.s3_client = session.client('s3')
 
         self.category_index = {1: {'id': 1, 'name': 'buttocks'}, 2: {'id': 2, 'name': 'female_breast'}, 3: {
             'id': 3, 'name': 'female_genitalia'}, 4: {'id': 4, 'name': 'male_genitalia'}}
@@ -63,7 +75,15 @@ class NudenyDetect:
         return img.copy(), detections
 
     def detect(self, file, filename):
+        """
+        Detect exposed body parts in an image file
 
+        Args:
+            file (<class 'bytes'>): Image file.
+            filename (str): Filename of the image.
+        Returns:
+            dict: predictions
+        """
         if not is_supported_file_type(file):
             return {
                 "filename": filename,
@@ -109,7 +129,14 @@ class NudenyDetect:
         }
 
     def detectUrl(self, source):
+        """
+        Detect exposed body parts in an image URL or data URI
 
+        Args:
+            source (str): Image URL or data URI.
+        Returns:
+            dict: predictions
+        """
         source_type = is_url_or_data_uri(source)
         if source_type == "url":
             if not is_valid_url(source):
@@ -180,5 +207,80 @@ class NudenyDetect:
 
         return {
             "source": source,
+            "exposed_parts": exposed_parts
+        }
+
+    def censor(self, file, filename):
+        """
+        Censor exposed body parts in an image file
+
+        Args:
+            file (<class 'bytes'>): Image file.
+            filename (str): Filename of the image.
+        Returns:
+            dict: predictions
+        """
+        if not is_supported_file_type(file):
+            return {
+                "filename": filename,
+                "source": "",
+                "exposed_parts": "invalid"
+            }
+
+        censored_image, detections = self.inference(file)
+        height = censored_image.shape[0]
+        width = censored_image.shape[1]
+
+        exposed_parts = {}
+        index = 0
+        exposed_count = 0
+        for scores in detections['detection_scores']:
+            if scores >= 0.5:
+                exposed_count += 1
+                bottom = detections['detection_boxes'][index][2] * height
+                top = detections['detection_boxes'][index][0] * height
+
+                right = detections['detection_boxes'][index][3] * width
+                left = detections['detection_boxes'][index][1] * width
+
+                start_point = (int(left) - 20, int(top) - 20)
+                end_point = (int(right) + 20, int(bottom) + 20)
+                censored_image = cv2.rectangle(
+                    censored_image, start_point, end_point, (0, 0, 0), -1)
+
+                key = self.category_index[detections['detection_classes']
+                                          [index]]['name']
+
+                exposed_parts[key] = {"confidence_score": scores * 100, "top": int(
+                    top), "left": int(left), "bottom": int(bottom), "right": int(right)}
+            else:
+                break
+            index += 1
+
+        if exposed_count == 0:
+            return {
+                "filename": filename,
+                "source": "",
+                "exposed_parts": {}
+            }
+
+        new_filename = str(uuid.uuid4()) + "-" + filename
+        # local_path = os.path.join('tmp', new_filename)
+        # cv2.imwrite(local_path, censored_image)
+
+        # with open(local_path, 'rb') as f:
+        #     self.s3_client.upload_file(f, "nudeny-storage", new_filename)
+
+        # os.remove(local_path)
+
+        success, encoded_image = cv2.imencode("."+imghdr.what(file="",h=file), censored_image)
+        if not success:
+            raise Exception("Failed to encode image")
+        self.s3_client.upload_fileobj(BytesIO(encoded_image), "nudeny-storage", new_filename, ExtraArgs={
+            'ContentType': 'image/jpeg'})
+
+        return {
+            "filename": filename,
+            "source": "https://nudeny-storage.s3.ap-southeast-1.amazonaws.com/{}".format(new_filename),
             "exposed_parts": exposed_parts
         }

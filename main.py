@@ -40,3 +40,11 @@ async def create_item(images: List[Image]):
     Receive URL JSON request.
     """
     return {"Prediction": [detection_model.detectUrl(image.source) for image in images]}
+
+@app.post("/censor/")
+async def create_upload_files(files: List[UploadFile]):
+    """
+    Receive image file request.
+    """
+    return {"Prediction": [detection_model.censor(await file.read(), file.filename) for file in files]}
+    
