@@ -87,7 +87,7 @@ class NudenyDetect:
         if not is_supported_file_type(file):
             return {
                 "filename": filename,
-                "exposed_parts": "invalid"
+                "exposed_parts": {}
             }
 
         image_with_detections, detections = self.inference(file)
@@ -105,7 +105,13 @@ class NudenyDetect:
             min_score_thresh=0.5,
             agnostic_mode=False)
 
-        exposed_parts = {}
+        exposed_parts = {
+            "female_breast": [],
+            "female_genitalia": [],
+            "male_genitalia": [],
+            "buttocks": []
+        }
+
         index = 0
         for scores in detections['detection_scores']:
             if scores >= 0.5:
@@ -117,8 +123,10 @@ class NudenyDetect:
 
                 key = self.category_index[detections['detection_classes']
                                           [index]]['name']
-                exposed_parts[key] = {"confidence_score": scores * 100, "top": int(
-                    top), "left": int(left), "bottom": int(bottom), "right": int(right)}
+                # exposed_parts[key] = {"confidence_score": scores * 100, "top": int(
+                #     top), "left": int(left), "bottom": int(bottom), "right": int(right)}
+                exposed_parts[key].append({"confidence_score": scores * 100, "top": int(
+                    top), "left": int(left), "bottom": int(bottom), "right": int(right)})
             else:
                 break
             index += 1
@@ -187,7 +195,12 @@ class NudenyDetect:
             min_score_thresh=0.5,
             agnostic_mode=False)
 
-        exposed_parts = {}
+        exposed_parts = {
+            "female_breast": [],
+            "female_genitalia": [],
+            "male_genitalia": [],
+            "buttocks": []
+        }
         index = 0
         for scores in detections['detection_scores']:
             if scores >= 0.5:
@@ -199,8 +212,10 @@ class NudenyDetect:
 
                 key = self.category_index[detections['detection_classes']
                                           [index]]['name']
-                exposed_parts[key] = {"confidence_score": scores * 100, "top": int(
-                    top), "left": int(left), "bottom": int(bottom), "right": int(right)}
+                # exposed_parts[key] = {"confidence_score": scores * 100, "top": int(
+                #     top), "left": int(left), "bottom": int(bottom), "right": int(right)}
+                exposed_parts[key].append({"confidence_score": scores * 100, "top": int(
+                    top), "left": int(left), "bottom": int(bottom), "right": int(right)})
             else:
                 break
             index += 1
@@ -223,15 +238,24 @@ class NudenyDetect:
         if not is_supported_file_type(file):
             return {
                 "filename": filename,
-                "source": "",
-                "exposed_parts": "invalid"
+                "url": "",
+                "exposed_parts": {}
             }
 
         censored_image, detections = self.inference(file)
         height = censored_image.shape[0]
         width = censored_image.shape[1]
 
-        exposed_parts = {}
+        # self.category_index = {1: {'id': 1, 'name': 'buttocks'}, 2: {'id': 2, 'name': 'female_breast'}, 3: {
+        #     'id': 3, 'name': 'female_genitalia'}, 4: {'id': 4, 'name': 'male_genitalia'}}
+
+        exposed_parts = {
+            "female_breast": [],
+            "female_genitalia": [],
+            "male_genitalia": [],
+            "buttocks": []
+        }
+
         index = 0
         exposed_count = 0
         for scores in detections['detection_scores']:
@@ -251,8 +275,10 @@ class NudenyDetect:
                 key = self.category_index[detections['detection_classes']
                                           [index]]['name']
 
-                exposed_parts[key] = {"confidence_score": scores * 100, "top": int(
-                    top), "left": int(left), "bottom": int(bottom), "right": int(right)}
+                # exposed_parts[key] = {"confidence_score": scores * 100, "top": int(
+                #     top), "left": int(left), "bottom": int(bottom), "right": int(right)}
+                exposed_parts[key].append({"confidence_score": scores * 100, "top": int(
+                    top), "left": int(left), "bottom": int(bottom), "right": int(right)})
             else:
                 break
             index += 1
@@ -260,11 +286,14 @@ class NudenyDetect:
         if exposed_count == 0:
             return {
                 "filename": filename,
-                "source": "",
+                "url": "",
                 "exposed_parts": {}
             }
 
         new_filename = str(uuid.uuid4()) + "-" + filename
+
+        # This one is to write into disk and upload to S3 bucket.
+        # For this one create a tmp folder in root dir.
         # local_path = os.path.join('tmp', new_filename)
         # cv2.imwrite(local_path, censored_image)
 
@@ -273,14 +302,118 @@ class NudenyDetect:
 
         # os.remove(local_path)
 
-        success, encoded_image = cv2.imencode("."+imghdr.what(file="",h=file), censored_image)
+        image_type = imghdr.what(file="", h=file)
+        success, encoded_image = cv2.imencode("."+image_type, censored_image)
+
         if not success:
             raise Exception("Failed to encode image")
         self.s3_client.upload_fileobj(BytesIO(encoded_image), "nudeny-storage", new_filename, ExtraArgs={
-            'ContentType': 'image/jpeg'})
+            'ContentType': 'image/'+image_type})
 
         return {
             "filename": filename,
-            "source": "https://nudeny-storage.s3.ap-southeast-1.amazonaws.com/{}".format(new_filename),
+            "url": "https://nudeny-storage.s3.ap-southeast-1.amazonaws.com/{}".format(new_filename),
+            "exposed_parts": exposed_parts
+        }
+
+    def censorUrl(self, source):
+        """
+        Censor exposed body parts in an image URL or data URI
+
+        Args:
+            source (str): Image URL or data URI.
+        Returns:
+            dict: predictions
+        """
+        source_type = is_url_or_data_uri(source)
+        if source_type == "url":
+            if not is_valid_url(source):
+                return {
+                    "source": source,
+                    "exposed_parts": {}
+                }
+            elif not is_image_url(source):
+                return {
+                    "source": source,
+                    "exposed_parts": {}
+                }
+            else:
+                response = requests.get(source)
+                file = response.content
+
+        elif source_type == "data_uri":
+            if not is_data_uri_image(source):
+                return {
+                    "source": source,
+                    "exposed_parts": {}
+                }
+            elif not is_valid_data_uri(source):
+                return {
+                    "source": source,
+                    "exposed_parts": {}
+                }
+            else:
+                file = base64.b64decode(source.split(",")[1])
+        elif source_type == "unknown":
+            return {
+                "source": source,
+                "exposed_parts": {}
+            }
+
+        censored_image, detections = self.inference(file)
+        height = censored_image.shape[0]
+        width = censored_image.shape[1]
+
+        exposed_parts = {
+            "female_breast": [],
+            "female_genitalia": [],
+            "male_genitalia": [],
+            "buttocks": []
+        }
+        index = 0
+        exposed_count = 0
+        for scores in detections['detection_scores']:
+            if scores >= 0.5:
+                exposed_count += 1
+                bottom = detections['detection_boxes'][index][2] * height
+                top = detections['detection_boxes'][index][0] * height
+
+                right = detections['detection_boxes'][index][3] * width
+                left = detections['detection_boxes'][index][1] * width
+
+                start_point = (int(left) - 20, int(top) - 20)
+                end_point = (int(right) + 20, int(bottom) + 20)
+                censored_image = cv2.rectangle(
+                    censored_image, start_point, end_point, (0, 0, 0), -1)
+
+                key = self.category_index[detections['detection_classes']
+                                          [index]]['name']
+
+                exposed_parts[key].append({"confidence_score": scores * 100, "top": int(
+                    top), "left": int(left), "bottom": int(bottom), "right": int(right)})
+            else:
+                break
+            index += 1
+
+        if exposed_count == 0:
+            return {
+                "source": source,
+                "url": "",
+                "exposed_parts": {}
+            }
+
+        new_filename = str(uuid.uuid4())
+        image_type = imghdr.what(file="", h=file)
+        success, encoded_image = cv2.imencode("."+image_type, censored_image)
+
+        if not success:
+            raise Exception("Failed to encode image")
+
+        self.s3_client.upload_fileobj(BytesIO(encoded_image), "nudeny-storage", new_filename, ExtraArgs={
+            'ContentType': 'image/'+image_type})
+
+        return {
+            "source": source,
+            "url": "https://nudeny-storage.s3.ap-southeast-1.amazonaws.com/{}".format(new_filename),
             "exposed_parts": exposed_parts
         }
