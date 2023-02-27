@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile
+from fastapi import FastAPI, UploadFile, HTTPException
 from typing import List
 from pydantic import BaseModel
 
@@ -25,6 +25,8 @@ async def create_item(images: List[Image]):
     """
     Receive URL JSON request.
     """
+    if len(images) == 0:
+        raise HTTPException(status_code=400, detail="No source(s) provided.")
     return {"Prediction": [classification_model.classifyUrl(image.source) for image in images]}
 
 @app.post("/detect/")
@@ -39,6 +41,8 @@ async def create_item(images: List[Image]):
     """
     Receive URL JSON request.
     """
+    if len(images) == 0:
+        raise HTTPException(status_code=400, detail="No source(s) provided.")
     return {"Prediction": [detection_model.detectUrl(image.source) for image in images]}
 
 @app.post("/censor/")
@@ -53,5 +57,7 @@ async def create_item(images: List[Image]):
     """
     Receive URL JSON request.
     """
+    if len(images) == 0:
+        raise HTTPException(status_code=400, detail="No source(s) provided.")
     return {"Prediction": [detection_model.censorUrl(image.source) for image in images]}
     

@@ -94,16 +94,16 @@ class NudenyDetect:
         height = image_with_detections.shape[0]
         width = image_with_detections.shape[1]
 
-        viz_utils.visualize_boxes_and_labels_on_image_array(
-            image_with_detections,
-            detections['detection_boxes'],
-            detections['detection_classes'],
-            detections['detection_scores'],
-            self.category_index,
-            use_normalized_coordinates=True,
-            max_boxes_to_draw=200,
-            min_score_thresh=0.5,
-            agnostic_mode=False)
+        # viz_utils.visualize_boxes_and_labels_on_image_array(
+        #     image_with_detections,
+        #     detections['detection_boxes'],
+        #     detections['detection_classes'],
+        #     detections['detection_scores'],
+        #     self.category_index,
+        #     use_normalized_coordinates=True,
+        #     max_boxes_to_draw=200,
+        #     min_score_thresh=0.5,
+        #     agnostic_mode=False)
 
         exposed_parts = {
             "female_breast": [],
@@ -184,16 +184,16 @@ class NudenyDetect:
         height = image_with_detections.shape[0]
         width = image_with_detections.shape[1]
 
-        viz_utils.visualize_boxes_and_labels_on_image_array(
-            image_with_detections,
-            detections['detection_boxes'],
-            detections['detection_classes'],
-            detections['detection_scores'],
-            self.category_index,
-            use_normalized_coordinates=True,
-            max_boxes_to_draw=200,
-            min_score_thresh=0.5,
-            agnostic_mode=False)
+        # viz_utils.visualize_boxes_and_labels_on_image_array(
+        #     image_with_detections,
+        #     detections['detection_boxes'],
+        #     detections['detection_classes'],
+        #     detections['detection_scores'],
+        #     self.category_index,
+        #     use_normalized_coordinates=True,
+        #     max_boxes_to_draw=200,
+        #     min_score_thresh=0.5,
+        #     agnostic_mode=False)
 
         exposed_parts = {
             "female_breast": [],
