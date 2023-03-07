@@ -402,8 +402,8 @@ class NudenyDetect:
                 "exposed_parts": {}
             }
 
-        new_filename = str(uuid.uuid4())
         image_type = imghdr.what(file="", h=file)
+        new_filename = str(uuid.uuid4()) + "." + image_type
         success, encoded_image = cv2.imencode("."+image_type, censored_image)
 
         if not success:
