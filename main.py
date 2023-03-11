@@ -1,6 +1,7 @@
 from fastapi import FastAPI, UploadFile, HTTPException
 from typing import List
 from pydantic import BaseModel
+import concurrent.futures
 
 from classify import NudenyClassify
 from detect import NudenyDetect
@@ -27,7 +28,11 @@ async def create_item(images: List[Image]):
     """
     if len(images) == 0:
         raise HTTPException(status_code=400, detail="No source(s) provided.")
-    return {"Prediction": [classification_model.classifyUrl(image.source) for image in images]}
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        results = list(executor.map(classification_model.classifyUrl, [image.source for image in images]))
+    
+    return {"Prediction": results}
+    # return {"Prediction": [classification_model.classifyUrl(image.source) for image in images]}
 
 @app.post("/detect/")
 async def create_upload_files(files: List[UploadFile]):
@@ -43,7 +48,11 @@ async def create_item(images: List[Image]):
     """
     if len(images) == 0:
         raise HTTPException(status_code=400, detail="No source(s) provided.")
-    return {"Prediction": [detection_model.detectUrl(image.source) for image in images]}
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        results = list(executor.map(detection_model.detectUrl, [image.source for image in images]))
+    
+    return {"Prediction": results}
+    #return {"Prediction": [detection_model.detectUrl(image.source) for image in images]}
 
 @app.post("/censor/")
 async def create_upload_files(files: List[UploadFile]):
@@ -59,5 +68,9 @@ async def create_item(images: List[Image]):
     """
     if len(images) == 0:
         raise HTTPException(status_code=400, detail="No source(s) provided.")
-    return {"Prediction": [detection_model.censorUrl(image.source) for image in images]}
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        results = list(executor.map(detection_model.censorUrl, [image.source for image in images]))
+    
+    return {"Prediction": results}
+    #return {"Prediction": [detection_model.censorUrl(image.source) for image in images]}
     

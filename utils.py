@@ -20,6 +20,26 @@ def is_valid_url(url):
     except ValueError:
         return False
 
+# def is_image_url(url):
+#     """
+#     Checks if URL has a content-type of image.
+
+#     Args:
+#         urls (str): URL string.
+
+#     Returns:
+#         boolean: Returns true if URL has a content-type image and
+#         if URL content-type is supported image, otherwise false.
+#     """
+#     response = requests.get(url)
+#     content_type = response.headers['content-type']
+#     type = content_type.split('/')[1]
+#     if content_type.split('/')[0] != 'image':
+#         return False
+
+#     image_types = ['jpg','jpeg','png','bmp', 'jfif']
+#     return any(type == image_type for image_type in image_types)
+
 def is_image_url(url):
     """
     Checks if URL has a content-type of image.
@@ -31,7 +51,16 @@ def is_image_url(url):
         boolean: Returns true if URL has a content-type image and
         if URL content-type is supported image, otherwise false.
     """
-    response = requests.get(url)
+    parsed_url = urlparse(url)
+    path = parsed_url.path
+    if '.' in path:
+        ext = path.split('.')[-1]
+        if ext in ['jpg', 'jpeg', 'png', 'bmp', 'jfif']:
+            return True
+        else:
+            return False
+        
+    response = requests.head(url)
     content_type = response.headers['content-type']
     type = content_type.split('/')[1]
     if content_type.split('/')[0] != 'image':
@@ -124,7 +153,7 @@ def download_image_url(url):
         BytesIO: BytesIO of the response.content.
         str: The file type of the URL.
     """
-    response = requests.get(url)
+    response = requests.get(url, stream=True)
 
     return BytesIO(response.content), response.headers['Content-Type'].split('/')[1]
 
