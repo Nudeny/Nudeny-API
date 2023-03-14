@@ -1,4 +1,5 @@
 from fastapi import FastAPI, UploadFile, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from typing import List
 from pydantic import BaseModel
 import concurrent.futures
@@ -10,6 +11,14 @@ classification_model = NudenyClassify()
 detection_model = NudenyDetect()
 
 app = FastAPI()
+
+origins = ["*"]  # This will allow all sites to access your backend
+methods = ["POST"]  # This will only allow the POST method
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_methods=methods,
+)
 
 class Image(BaseModel):
     source: str
