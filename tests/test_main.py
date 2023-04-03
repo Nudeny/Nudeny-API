@@ -14,22 +14,32 @@ PATHS = [
 ]
 
 DATA_URL = [
-        {
-            "source": "https://filesamples.com/samples/image/jfif/sample1.jfif"
-        },
-        {
-            "source": "https://w7.pngwing.com/pngs/895/199/png-transparent-spider-man-heroes-download-with-transparent-background-free-thumbnail.png"
-        },
-        {
-            "source": "http://digitalcommunications.wp.st-andrews.ac.uk/files/2019/04/JPEG_compression_Example.jpg"
-        },
-        {
-            "source": "https://filesamples.com/samples/image/jpeg/sample_640%C3%97426.jpeg"
-        },
-        {
-            "source": "https://people.math.sc.edu/Burkardt/data/bmp/blackbuck.bmp"
-        }
-    ]
+    {
+        "source": "https://filesamples.com/samples/image/jfif/sample1.jfif"
+    },
+    {
+        "source": "https://w7.pngwing.com/pngs/895/199/png-transparent-spider-man-heroes-download-with-transparent-background-free-thumbnail.png"
+    },
+    {
+        "source": "http://digitalcommunications.wp.st-andrews.ac.uk/files/2019/04/JPEG_compression_Example.jpg"
+    },
+    {
+        "source": "https://filesamples.com/samples/image/jpeg/sample_640%C3%97426.jpeg"
+    },
+    {
+        "source": "https://people.math.sc.edu/Burkardt/data/bmp/blackbuck.bmp"
+    },
+    {
+        "source": "https://static-ca-cdn.eporner.com/gallery/XI/9y/GKjer8q9yXI/770450-completely-nude-p.jpg"
+    },
+    {
+        "source": "https://external-preview.redd.it/v6wIR5kXQvzMKryDJfDmEqt0so9TLuNE0XN1Ps73O-M.jpg?auto=webp&v=enabled&s=d21bbcd1707686d4a63447fb8e5ab6e10111470d"
+    },
+    {
+        "source": "https://external-preview.redd.it/sxXLzNmT8CM9klV5vAzLKy9gIJKDfyK4Kfg0G4lLzXc.jpg?auto=webp&v=enabled&s=147af31c35a1cf56645dd9592f4ed03cad38b0c1"
+    }
+]
+
 
 # Invalid method
 
@@ -226,8 +236,10 @@ def test_censor():
 
 # Send valid URL
 
+
 def test_classify_url():
-    response = requests.post("http://127.0.0.1:8000/classify-url", json=DATA_URL)
+    response = requests.post(
+        "http://127.0.0.1:8000/classify-url", json=DATA_URL)
     assert response.status_code == 200
 
 
