@@ -15,7 +15,7 @@ import imghdr
 from utils import is_supported_file_type, is_url_or_data_uri, is_valid_url, is_valid_data_uri
 from utils import is_data_uri_image, is_image_url
 
-PATH_TO_SAVED_MODEL = ".\models\detection\model.tflite"
+PATH_TO_SAVED_MODEL = ".\models\detection\EfficientDet2.tflite"
 PATH_TO_LABELS = ".\models\detection\labelmap.txt"
 min_conf_threshold = 0.5
 
