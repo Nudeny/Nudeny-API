@@ -166,6 +166,11 @@ class NudenyDetect:
                 }
             else:
                 response = requests.get(source)
+                if response.status_code != 200:
+                    return {
+                        "source": source,
+                        "exposed_parts": {}
+                    }
                 file = response.content
 
         elif source_type == "data_uri":
@@ -277,6 +282,11 @@ class NudenyDetect:
                 }
             else:
                 response = requests.get(source)
+                if response.status_code != 200:
+                    return {
+                        "source": source,
+                        "exposed_parts": {}
+                    }
                 file = response.content
 
         elif source_type == "data_uri":

@@ -152,8 +152,11 @@ def download_image_url(url):
     Returns:
         BytesIO: BytesIO of the response.content.
         str: The file type of the URL.
+        None: If response status code is not equal to 200 (Success)
     """
     response = requests.get(url, stream=True)
+    if response.status_code != 200:
+        return None, None
 
     return BytesIO(response.content), response.headers['Content-Type'].split('/')[1]
 
