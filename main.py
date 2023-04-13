@@ -57,11 +57,11 @@ async def create_item(images: List[Image]):
     """
     if len(images) == 0:
         raise HTTPException(status_code=400, detail="No source(s) provided.")
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        results = list(executor.map(detection_model.detectUrl, [image.source for image in images]))
+    # with concurrent.futures.ThreadPoolExecutor() as executor:
+    #     results = list(executor.map(detection_model.detectUrl, [image.source for image in images]))
     
-    return {"Prediction": results}
-    #return {"Prediction": [detection_model.detectUrl(image.source) for image in images]}
+    # return {"Prediction": results}
+    return {"Prediction": [detection_model.detectUrl(image.source) for image in images]}
 
 @app.post("/censor/")
 async def create_upload_files(files: List[UploadFile]):
@@ -77,9 +77,9 @@ async def create_item(images: List[Image]):
     """
     if len(images) == 0:
         raise HTTPException(status_code=400, detail="No source(s) provided.")
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        results = list(executor.map(detection_model.censorUrl, [image.source for image in images]))
+    # with concurrent.futures.ThreadPoolExecutor() as executor:
+    #     results = list(executor.map(detection_model.censorUrl, [image.source for image in images]))
     
-    return {"Prediction": results}
-    #return {"Prediction": [detection_model.censorUrl(image.source) for image in images]}
+    # return {"Prediction": results}
+    return {"Prediction": [detection_model.censorUrl(image.source) for image in images]}
     

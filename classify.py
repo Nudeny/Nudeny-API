@@ -87,6 +87,11 @@ class NudenyClassify:
                 }
             else:
                 bytes_io, type = download_image_url(source)
+                if bytes_io == None and type == None:
+                    return {
+                        "source": source,
+                        "class": "invalid"
+                    } 
                 img = Image.open(bytes_io)
 
         elif source_type == "data_uri":

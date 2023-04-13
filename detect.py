@@ -1,38 +1,47 @@
-import warnings
 from io import BytesIO
 import numpy as np
-from object_detection.utils import visualization_utils as viz_utils
 import cv2
 import tensorflow as tf
+from tensorflow.lite.python.interpreter import Interpreter
 import os
-import time
 import base64
 import requests
 from dotenv import load_dotenv
 import uuid
 import boto3
-
+import mimetypes
 import imghdr
 
 from utils import is_supported_file_type, is_url_or_data_uri, is_valid_url, is_valid_data_uri
 from utils import is_data_uri_image, is_image_url
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-warnings.filterwarnings('ignore')
-
-
-PATH_TO_SAVED_MODEL = ".\models\detection\saved_model"
+PATH_TO_SAVED_MODEL = ".\models\detection\EfficientDet2.tflite"
+PATH_TO_LABELS = ".\models\detection\labelmap.txt"
+min_conf_threshold = 0.5
 
 
 class NudenyDetect:
 
     def __init__(self):
-        print('Loading model...', end='')
-        start_time = time.time()
-        self.detect_fn = tf.saved_model.load(PATH_TO_SAVED_MODEL)
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        print('Done! Took {} seconds'.format(elapsed_time))
+        # Load the label map into memory
+        with open(PATH_TO_LABELS, 'r') as f:
+            self.labels = [line.strip() for line in f.readlines()]
+
+        # Load the Tensorflow Lite model into memory
+        self.interpreter = Interpreter(model_path=PATH_TO_SAVED_MODEL)
+        self.interpreter.allocate_tensors()
+
+        # Get model details
+        self.input_details = self.interpreter.get_input_details()
+
+        self.output_details = self.interpreter.get_output_details()
+        self.height = self.input_details[0]['shape'][1]
+        self.width = self.input_details[0]['shape'][2]
+
+        self.float_input = (self.input_details[0]['dtype'] == np.float32)
+
+        self.input_mean = 127.5
+        self.input_std = 127.5
 
         load_dotenv()
         session = boto3.Session(
@@ -41,9 +50,6 @@ class NudenyDetect:
             region_name=os.environ.get('AWS_DEFAULT_REGION')
         )
         self.s3_client = session.client('s3')
-
-        self.category_index = {1: {'id': 1, 'name': 'buttocks'}, 2: {'id': 2, 'name': 'female_breast'}, 3: {
-            'id': 3, 'name': 'female_genitalia'}, 4: {'id': 4, 'name': 'male_genitalia'}}
 
     def inference(self, file):
         """
@@ -56,21 +62,61 @@ class NudenyDetect:
             Any: Image with detection
             dict: Detections
         """
+
+        # Load image and resize to expected shape [1xHxWx3]
         img_stream = BytesIO(file)
         img = cv2.imdecode(np.frombuffer(img_stream.read(), np.uint8), 1)
         image_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        image_expanded = np.expand_dims(image_rgb, axis=0)
-        input_tensor = tf.convert_to_tensor(img)
-        input_tensor = input_tensor[tf.newaxis, ...]
-        detections = self.detect_fn(input_tensor)
+        imH, imW, _ = img.shape
+        image_resized = cv2.resize(image_rgb, (self.width, self.height))
+        input_data = np.expand_dims(image_resized, axis=0)
 
-        num_detections = int(detections.pop('num_detections'))
-        detections = {key: value[0, :num_detections].numpy()
-                      for key, value in detections.items()}
-        detections['num_detections'] = num_detections
+        # Normalize pixel values if using a floating model (i.e. if model is non-quantized)
+        if self.float_input:
+            input_data = (np.float32(input_data) -
+                          self.input_mean) / self.input_std
 
-        detections['detection_classes'] = detections['detection_classes'].astype(
-            np.int64)
+        # Perform the actual detection by running the model with the image as input
+        self.interpreter.set_tensor(self.input_details[0]['index'], input_data)
+        self.interpreter.invoke()
+
+        # Retrieve detection results
+        boxes = self.interpreter.get_tensor(self.output_details[1]['index'])[
+            0]  # Bounding box coordinates of detected objects
+        classes = self.interpreter.get_tensor(self.output_details[3]['index'])[
+            0]  # Class index of detected objects
+        scores = self.interpreter.get_tensor(self.output_details[0]['index'])[
+            0]  # Confidence of detected objects
+
+        # detections = []
+
+        detections = {
+            "female_breast": [],
+            "female_genitalia": [],
+            "male_genitalia": [],
+            "buttocks": []
+        }
+
+        for i in range(len(scores)):
+            if ((scores[i] > min_conf_threshold) and (scores[i] <= 1.0)):
+                # Get bounding box coordinates and draw box
+                # Interpreter can return coordinates that are outside of image dimensions, need to force them to be within image using max() and min()
+                ymin = int(max(1, (boxes[i][0] * imH)))
+                xmin = int(max(1, (boxes[i][1] * imW)))
+                ymax = int(min(imH, (boxes[i][2] * imH)))
+                xmax = int(min(imW, (boxes[i][3] * imW)))
+
+                object_name = self.labels[int(classes[i])]
+
+                exposed = {
+                    "confidence_score": scores[i] * 100,
+                    "top": ymin,
+                    "left": xmin,
+                    "bottom": ymax,
+                    "right": xmax
+                }
+                
+                detections[object_name].append(exposed)
 
         return img.copy(), detections
 
@@ -90,50 +136,11 @@ class NudenyDetect:
                 "exposed_parts": {}
             }
 
-        image_with_detections, detections = self.inference(file)
-        height = image_with_detections.shape[0]
-        width = image_with_detections.shape[1]
-
-        # viz_utils.visualize_boxes_and_labels_on_image_array(
-        #     image_with_detections,
-        #     detections['detection_boxes'],
-        #     detections['detection_classes'],
-        #     detections['detection_scores'],
-        #     self.category_index,
-        #     use_normalized_coordinates=True,
-        #     max_boxes_to_draw=200,
-        #     min_score_thresh=0.5,
-        #     agnostic_mode=False)
-
-        exposed_parts = {
-            "female_breast": [],
-            "female_genitalia": [],
-            "male_genitalia": [],
-            "buttocks": []
-        }
-
-        index = 0
-        for scores in detections['detection_scores']:
-            if scores >= 0.5:
-                bottom = detections['detection_boxes'][index][2] * height
-                top = detections['detection_boxes'][index][0] * height
-
-                right = detections['detection_boxes'][index][3] * width
-                left = detections['detection_boxes'][index][1] * width
-
-                key = self.category_index[detections['detection_classes']
-                                          [index]]['name']
-                # exposed_parts[key] = {"confidence_score": scores * 100, "top": int(
-                #     top), "left": int(left), "bottom": int(bottom), "right": int(right)}
-                exposed_parts[key].append({"confidence_score": scores * 100, "top": int(
-                    top), "left": int(left), "bottom": int(bottom), "right": int(right)})
-            else:
-                break
-            index += 1
+        _, detections = self.inference(file)
 
         return {
             "filename": filename,
-            "exposed_parts": exposed_parts
+            "exposed_parts": detections
         }
 
     def detectUrl(self, source):
@@ -159,6 +166,11 @@ class NudenyDetect:
                 }
             else:
                 response = requests.get(source)
+                if response.status_code != 200:
+                    return {
+                        "source": source,
+                        "exposed_parts": {}
+                    }
                 file = response.content
 
         elif source_type == "data_uri":
@@ -180,49 +192,11 @@ class NudenyDetect:
                 "exposed_parts": {}
             }
 
-        image_with_detections, detections = self.inference(file)
-        height = image_with_detections.shape[0]
-        width = image_with_detections.shape[1]
-
-        # viz_utils.visualize_boxes_and_labels_on_image_array(
-        #     image_with_detections,
-        #     detections['detection_boxes'],
-        #     detections['detection_classes'],
-        #     detections['detection_scores'],
-        #     self.category_index,
-        #     use_normalized_coordinates=True,
-        #     max_boxes_to_draw=200,
-        #     min_score_thresh=0.5,
-        #     agnostic_mode=False)
-
-        exposed_parts = {
-            "female_breast": [],
-            "female_genitalia": [],
-            "male_genitalia": [],
-            "buttocks": []
-        }
-        index = 0
-        for scores in detections['detection_scores']:
-            if scores >= 0.5:
-                bottom = detections['detection_boxes'][index][2] * height
-                top = detections['detection_boxes'][index][0] * height
-
-                right = detections['detection_boxes'][index][3] * width
-                left = detections['detection_boxes'][index][1] * width
-
-                key = self.category_index[detections['detection_classes']
-                                          [index]]['name']
-                # exposed_parts[key] = {"confidence_score": scores * 100, "top": int(
-                #     top), "left": int(left), "bottom": int(bottom), "right": int(right)}
-                exposed_parts[key].append({"confidence_score": scores * 100, "top": int(
-                    top), "left": int(left), "bottom": int(bottom), "right": int(right)})
-            else:
-                break
-            index += 1
+        _, detections = self.inference(file)
 
         return {
             "source": source,
-            "exposed_parts": exposed_parts
+            "exposed_parts": detections
         }
 
     def censor(self, file, filename):
@@ -243,45 +217,14 @@ class NudenyDetect:
             }
 
         censored_image, detections = self.inference(file)
-        height = censored_image.shape[0]
-        width = censored_image.shape[1]
 
-        # self.category_index = {1: {'id': 1, 'name': 'buttocks'}, 2: {'id': 2, 'name': 'female_breast'}, 3: {
-        #     'id': 3, 'name': 'female_genitalia'}, 4: {'id': 4, 'name': 'male_genitalia'}}
-
-        exposed_parts = {
-            "female_breast": [],
-            "female_genitalia": [],
-            "male_genitalia": [],
-            "buttocks": []
-        }
-
-        index = 0
         exposed_count = 0
-        for scores in detections['detection_scores']:
-            if scores >= 0.5:
+        for exposed_part in detections.values():
+            for prediction in exposed_part:
                 exposed_count += 1
-                bottom = detections['detection_boxes'][index][2] * height
-                top = detections['detection_boxes'][index][0] * height
-
-                right = detections['detection_boxes'][index][3] * width
-                left = detections['detection_boxes'][index][1] * width
-
-                start_point = (int(left) - 20, int(top) - 20)
-                end_point = (int(right) + 20, int(bottom) + 20)
-                censored_image = cv2.rectangle(
-                    censored_image, start_point, end_point, (0, 0, 0), -1)
-
-                key = self.category_index[detections['detection_classes']
-                                          [index]]['name']
-
-                # exposed_parts[key] = {"confidence_score": scores * 100, "top": int(
-                #     top), "left": int(left), "bottom": int(bottom), "right": int(right)}
-                exposed_parts[key].append({"confidence_score": scores * 100, "top": int(
-                    top), "left": int(left), "bottom": int(bottom), "right": int(right)})
-            else:
-                break
-            index += 1
+                start_point = (int(prediction['left']) - 20, int(prediction['top']) - 20)
+                end_point = (int(prediction['right']) + 20, int(prediction['bottom']) + 20)
+                censored_image = cv2.rectangle(censored_image, start_point, end_point, (0, 0, 0), -1)
 
         if exposed_count == 0:
             return {
@@ -313,9 +256,9 @@ class NudenyDetect:
         return {
             "filename": filename,
             "url": "https://nudeny-storage.s3.ap-southeast-1.amazonaws.com/{}".format(new_filename),
-            "exposed_parts": exposed_parts
+            "exposed_parts": detections
         }
-
+    
     def censorUrl(self, source):
         """
         Censor exposed body parts in an image URL or data URI
@@ -339,6 +282,11 @@ class NudenyDetect:
                 }
             else:
                 response = requests.get(source)
+                if response.status_code != 200:
+                    return {
+                        "source": source,
+                        "exposed_parts": {}
+                    }
                 file = response.content
 
         elif source_type == "data_uri":
@@ -361,39 +309,14 @@ class NudenyDetect:
             }
 
         censored_image, detections = self.inference(file)
-        height = censored_image.shape[0]
-        width = censored_image.shape[1]
 
-        exposed_parts = {
-            "female_breast": [],
-            "female_genitalia": [],
-            "male_genitalia": [],
-            "buttocks": []
-        }
-        index = 0
         exposed_count = 0
-        for scores in detections['detection_scores']:
-            if scores >= 0.5:
+        for exposed_part in detections.values():
+            for prediction in exposed_part:
                 exposed_count += 1
-                bottom = detections['detection_boxes'][index][2] * height
-                top = detections['detection_boxes'][index][0] * height
-
-                right = detections['detection_boxes'][index][3] * width
-                left = detections['detection_boxes'][index][1] * width
-
-                start_point = (int(left) - 20, int(top) - 20)
-                end_point = (int(right) + 20, int(bottom) + 20)
-                censored_image = cv2.rectangle(
-                    censored_image, start_point, end_point, (0, 0, 0), -1)
-
-                key = self.category_index[detections['detection_classes']
-                                          [index]]['name']
-
-                exposed_parts[key].append({"confidence_score": scores * 100, "top": int(
-                    top), "left": int(left), "bottom": int(bottom), "right": int(right)})
-            else:
-                break
-            index += 1
+                start_point = (int(prediction['left']) - 20, int(prediction['top']) - 20)
+                end_point = (int(prediction['right']) + 20, int(prediction['bottom']) + 20)
+                censored_image = cv2.rectangle(censored_image, start_point, end_point, (0, 0, 0), -1)
 
         if exposed_count == 0:
             return {
@@ -403,6 +326,14 @@ class NudenyDetect:
             }
 
         image_type = imghdr.what(file="", h=file)
+
+        if image_type == None:
+            content_type = response.headers.get('Content-Type')
+            if content_type is not None:
+                image_type = mimetypes.guess_extension(content_type.split(';')[0])[1:]
+            else:
+                print("Content type not found in headers")
+
         new_filename = str(uuid.uuid4()) + "." + image_type
         success, encoded_image = cv2.imencode("."+image_type, censored_image)
 
@@ -415,5 +346,6 @@ class NudenyDetect:
         return {
             "source": source,
             "url": "https://nudeny-storage.s3.ap-southeast-1.amazonaws.com/{}".format(new_filename),
-            "exposed_parts": exposed_parts
+            "exposed_parts": detections
         }
+
