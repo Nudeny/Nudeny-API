@@ -14,7 +14,7 @@ app = FastAPI()
 
 origins = ["*"]  # This will allow all sites to access your backend
 methods = ["POST"]  # This will only allow the POST method
-app.add_middleware(
+app.add_middleware( 
     CORSMiddleware,
     allow_origins=origins,
     allow_methods=methods,
@@ -37,11 +37,11 @@ async def create_item(images: List[Image]):
     """
     if len(images) == 0:
         raise HTTPException(status_code=400, detail="No source(s) provided.")
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        results = list(executor.map(classification_model.classifyUrl, [image.source for image in images]))
+    # with concurrent.futures.ThreadPoolExecutor() as executor:
+    #     results = list(executor.map(classification_model.classifyUrl, [image.source for image in images]))
     
-    return {"Prediction": results}
-    # return {"Prediction": [classification_model.classifyUrl(image.source) for image in images]}
+    # return {"Prediction": results}
+    return {"Prediction": [classification_model.classifyUrl(image.source) for image in images]}
 
 @app.post("/detect/")
 async def create_upload_files(files: List[UploadFile]):
