@@ -62,13 +62,13 @@ def is_image_url(url):
             return False
         
     response = requests.head(url)
-    content_type = response.headers['content-type']
+    content_type = response.headers['content-type'].split('/')
 
     if len(content_type) == 1:
-        type = content_type.split('/')[0]
+        type = content_type[0]
     elif len(content_type) == 2:
-        type = content_type.split('/')[1]
-        if content_type.split('/')[0] != 'image':
+        type = content_type[1]
+        if content_type[0] != 'image':
             return False
 
     image_types = ['jpg','jpeg','png','bmp', 'jfif']
