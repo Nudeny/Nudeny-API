@@ -53,6 +53,7 @@ def is_image_url(url):
     """
     parsed_url = urlparse(url)
     path = parsed_url.path
+    type = ''
     if '.' in path:
         ext = path.split('.')[-1]
         if ext in ['jpg', 'jpeg', 'png', 'bmp', 'jfif']:
