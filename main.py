@@ -32,7 +32,7 @@ class Image(BaseModel):
     source: str
 
 @app.post("/classify/")
-@limiter.limit("6000/minute")
+@limiter.limit("30000/minute")
 async def create_upload_files(request: Request, files: List[UploadFile]):
     """
     Receive image file request.
@@ -40,7 +40,7 @@ async def create_upload_files(request: Request, files: List[UploadFile]):
     return {"Prediction": [classification_model.classify(await file.read(), file.filename) for file in files]}
 
 @app.post("/classify-url/")
-@limiter.limit("6000/minute")
+@limiter.limit("30000/minute")
 async def create_item(request: Request, images: List[Image]):
     """
     Receive URL JSON request.
@@ -54,7 +54,7 @@ async def create_item(request: Request, images: List[Image]):
     return {"Prediction": [classification_model.classifyUrl(image.source) for image in images]}
 
 @app.post("/detect/")
-@limiter.limit("6000/minute")
+@limiter.limit("30000/minute")
 async def create_upload_files(request: Request, files: List[UploadFile]):
     """
     Receive image file request.
@@ -62,7 +62,7 @@ async def create_upload_files(request: Request, files: List[UploadFile]):
     return {"Prediction": [detection_model.detect(await file.read(), file.filename) for file in files]}
 
 @app.post("/detect-url/")
-@limiter.limit("6000/minute")
+@limiter.limit("30000/minute")
 async def create_item(request: Request, images: List[Image]):
     """
     Receive URL JSON request.
@@ -76,7 +76,7 @@ async def create_item(request: Request, images: List[Image]):
     return {"Prediction": [detection_model.detectUrl(image.source) for image in images]}
 
 @app.post("/censor/")
-@limiter.limit("6000/minute")
+@limiter.limit("30000/minute")
 async def create_upload_files(request: Request, files: List[UploadFile]):
     """
     Receive image file request.
@@ -84,7 +84,7 @@ async def create_upload_files(request: Request, files: List[UploadFile]):
     return {"Prediction": [detection_model.censor(await file.read(), file.filename) for file in files]}
 
 @app.post("/censor-url/")
-@limiter.limit("6000/minute")
+@limiter.limit("30000/minute")
 async def create_item(request: Request, images: List[Image]):
     """
     Receive URL JSON request.
