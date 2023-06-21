@@ -53,6 +53,7 @@ def is_image_url(url):
     """
     parsed_url = urlparse(url)
     path = parsed_url.path
+    type = ''
     if '.' in path:
         ext = path.split('.')[-1]
         if ext in ['jpg', 'jpeg', 'png', 'bmp', 'jfif']:
@@ -61,10 +62,14 @@ def is_image_url(url):
             return False
         
     response = requests.head(url)
-    content_type = response.headers['content-type']
-    type = content_type.split('/')[1]
-    if content_type.split('/')[0] != 'image':
-        return False
+    content_type = response.headers['content-type'].split('/')
+
+    if len(content_type) == 1:
+        type = content_type[0]
+    elif len(content_type) == 2:
+        type = content_type[1]
+        if content_type[0] != 'image':
+            return False
 
     image_types = ['jpg','jpeg','png','bmp', 'jfif']
     return any(type == image_type for image_type in image_types)
@@ -154,11 +159,23 @@ def download_image_url(url):
         str: The file type of the URL.
         None: If response status code is not equal to 200 (Success)
     """
+    SUPPORTED_FILE_TYPE = ['jpg','jpeg','png','bmp', 'jfif']
+    type = ''
+
     response = requests.get(url, stream=True)
     if response.status_code != 200:
         return None, None
+    
+    content_type = response.headers['Content-Type'].split('/')
 
-    return BytesIO(response.content), response.headers['Content-Type'].split('/')[1]
+    if len(content_type) == 1:
+        if content_type[0] not in SUPPORTED_FILE_TYPE:
+            return None, None
+        type = content_type[0]
+    elif len(content_type) == 2:
+        type = content_type[1]
+
+    return BytesIO(response.content), type
 
 def decode_data_uri(uri):
     """
